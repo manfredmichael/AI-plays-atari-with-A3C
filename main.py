@@ -84,3 +84,12 @@ jj
         actor_loss = -log_probs * (returns - values)
 
         total_loss = (critic_loss + actor_loss).mean()
+
+    def choose_action(self, observation):
+        state = T.tensor(observation, dtype=T.float)
+        pi, values = self.forward(state)
+        probs = T.softmax(pi, dim=1)
+        dist = Categorical(probs)
+        action = dist.sample().numpy()[0]
+
+        return action
