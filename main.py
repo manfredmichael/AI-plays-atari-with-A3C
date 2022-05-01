@@ -42,3 +42,12 @@ class ActorCritic(nn.Module):
         self.rewards = []
         self.actions = []
         self.states = []
+
+    def forward(self, state):
+        pi1 = F.relu(self.pi1(state))
+        v1 = F.relu(self.v1(state))
+
+        pi = self.pi(pi1)
+        v = self.v(v1)
+
+        return pi, v
