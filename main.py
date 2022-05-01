@@ -37,3 +37,8 @@ class ActorCritic(nn.Module):
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
+
+    def clear_memory(self):
+        self.rewards = []
+        self.actions = []
+        self.states = []
