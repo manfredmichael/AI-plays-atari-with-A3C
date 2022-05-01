@@ -20,4 +20,15 @@ class SharedAdam(T.optim.Adam):
 
                 state['exp_avg'].share_memory_()
                 state['exp_avg_sq'].share_memory_()
-                
+
+class ActorCritic(nn.Module):
+    def __init__(self, input_dims, n_actions, gamma=0.99):
+        super(ActorCritic, self).__init__()
+
+        self.gamma = gamma
+        self.pi1 = nn.Linear(*input_dims, 128)
+        self.v1 = nn.Linear(*input_dims, 128)
+        self.pi = nn.Linear(128, n_actions)
+        self.v = nn.Linear(128, 1)
+        
+        self.clear_memory()
