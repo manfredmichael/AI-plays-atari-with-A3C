@@ -66,3 +66,21 @@ class ActorCritic(nn.Module):
         batch_return = T.tensor(batch_return, dtype=T.float)
 
         return batch_return
+
+    def calc_loss(self, done):
+        states = T.tensor(self.states, dtype=T.float)
+        actions = T.tensor(self.actions, dtype=T.float)
+
+        returns = self.calc_R(done)
+
+        pi, values = self.forward(states)
+        values = values.squeeze() 
+jj
+        critic_loss = (returns - values) ** 2
+        probs = T.softmax(pi, dim=1)
+        dist = Categorical(probs)
+
+        log_probs = dist.log_probs(actions)
+        actor_loss = -log_probs * (returns - values)
+
+        total_loss = (critic_loss + actor_loss).mean()
