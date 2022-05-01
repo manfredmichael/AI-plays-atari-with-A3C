@@ -32,3 +32,8 @@ class ActorCritic(nn.Module):
         self.v = nn.Linear(128, 1)
         
         self.clear_memory()
+
+    def remember(self, state, action, reward):
+        self.states.append(state)
+        self.actions.append(action)
+        self.rewards.append(reward)
