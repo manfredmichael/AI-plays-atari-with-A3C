@@ -51,3 +51,18 @@ class ActorCritic(nn.Module):
         v = self.v(v1)
 
         return pi, v
+
+    def calc_R(self, done):
+        states = T.tensor(self.states, dtype=T.float)
+        _, v = self.forward(states)
+
+        R = v[-1] * (1-int(done))
+        
+        batch_return = []
+        for reward in self.rewards[::-1]:
+            R = reward + self.gamma * R
+            batch_return.append(R)
+        batch_return.reverse()
+        batch_return = T.tensor(batch_return, dtype=T.float)
+
+        return batch_return
