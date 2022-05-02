@@ -9,9 +9,9 @@ class ActorCritic(nn.Module):
 
         self.gamma = gamma
         self.pi1 = nn.Linear(*input_dims, 128)
-        self.v1 = nn.Linear(*input_dims, 128)
-        self.pi = nn.Linear(128, n_actions)
-        self.v = nn.Linear(128, 1)
+        self.pi2 = nn.Linear(128, 64)
+        self.pi = nn.Linear(64, n_actions)
+        self.v = nn.Linear(64, 1)
         
         self.clear_memory()
 
@@ -27,10 +27,10 @@ class ActorCritic(nn.Module):
 
     def forward(self, state):
         pi1 = F.relu(self.pi1(state))
-        v1 = F.relu(self.v1(state))
+        pi2 = F.relu(self.pi2(pi1))
 
-        pi = self.pi(pi1)
-        v = self.v(v1)
+        pi = self.pi(pi2)
+        v = self.v(pi2)
 
         return pi, v
 
