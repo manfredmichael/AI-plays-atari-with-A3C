@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F 
 from torch.distributions import Categorical
 
+import gym
+
 class SharedAdam(T.optim.Adam):
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.99), eps=1e-8,
             weight_decay=0):
@@ -75,18 +77,19 @@ class ActorCritic(nn.Module):
 
         pi, values = self.forward(states)
         values = values.squeeze() 
-jj
         critic_loss = (returns - values) ** 2
+
         probs = T.softmax(pi, dim=1)
         dist = Categorical(probs)
-
-        log_probs = dist.log_probs(actions)
+        log_probs = dist.log_prob(actions)
         actor_loss = -log_probs * (returns - values)
 
         total_loss = (critic_loss + actor_loss).mean()
 
+        return total_loss
+
     def choose_action(self, observation):
-        state = T.tensor(observation, dtype=T.float)
+        state = T.tensor([observation], dtype=T.float)
         pi, values = self.forward(state)
         probs = T.softmax(pi, dim=1)
         dist = Categorical(probs)
@@ -100,19 +103,21 @@ class Agent(mp.Process):
         super(Agent, self).__init__()
         self.local_actor_critic = ActorCritic(input_dims, n_actions, gamma)
         self.global_actor_critic = global_actor_critic
-        self.name = 'w%02i' + name
+        self.name = 'worker ' + str(name)
         self.episode_idx = global_ep_idx
         self.env = gym.make(env_id)
         self.optimizer = optimizer
+
+
+
 
     def run(self):
         t_step = 1
         while self.episode_idx.value < N_GAMES:
             done = False
-            observation = env.reset()
+            observation = self.env.reset()
             score = 0 
             self.local_actor_critic.clear_memory()
-
             while not done:
                 action = self.local_actor_critic.choose_action(observation)
                 observation_, reward, done, info = self.env.step(action)
@@ -120,18 +125,46 @@ class Agent(mp.Process):
                 self.local_actor_critic.remember(observation, action, reward)
                 if t_step % T_MAX == 0 or done:
                     loss = self.local_actor_critic.calc_loss(done)
-                    loss.optimizer.zero_grad()
+                    self.optimizer.zero_grad()
                     loss.backward()
-                    for local_param, global_param, in zip(self.local_actor_critic.parameters(), 
-                                                          self.global_actor_critic.parameters()):
+                    for local_param, global_param, in zip(
+                            self.local_actor_critic.parameters(), 
+                            self.global_actor_critic.parameters()):
                         global_param.grad = local_param.grad
                     self.optimizer.step()
-                    self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict)
+                    self.local_actor_critic.load_state_dict(
+                            self.global_actor_critic.state_dict())
                     self.local_actor_critic.clear_memory()
-                    t_step += 1 
-                    observation = observation_
-                    with self.episode_idx.get_lock():
-                        self.episode_idx.value += 1
-                    print(self.name, 'episode', self.episode_idx.value, 'reward %1.f' % score)
+                t_step += 1 
+                observation = observation_
+            with self.episode_idx.get_lock():
+                self.episode_idx.value += 1
+            print(self.name, 'episode', self.episode_idx.value, 'reward %1.f' % score)
+
+
+if __name__ == '__main__':
+    lr = 1e-4
+    env_id = 'CartPole-v0'
+    n_actions = 2 
+    input_dims = [4]
+    N_GAMES = 5000 
+    T_MAX = 5 
+    global_actor_critic = ActorCritic(input_dims, n_actions)
+    global_actor_critic.share_memory()
+    optim = SharedAdam(global_actor_critic.parameters(),
+                       lr=lr, betas=(0.92, 0.999))
+    global_ep = mp.Value('i', 0)
+
+    workers = [Agent(global_actor_critic,
+                     optim,
+                     input_dims,
+                     n_actions,
+                     gamma=0.99,
+                     lr=lr,
+                     name=i,
+                     global_ep_idx=global_ep,
+                     env_id=env_id) for i in range(mp.cpu_count())]
+    [w.start() for w in workers]
+    [w.join() for w in workers]
 
 
