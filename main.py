@@ -108,9 +108,6 @@ class Agent(mp.Process):
         self.env = gym.make(env_id)
         self.optimizer = optimizer
 
-
-
-
     def run(self):
         t_step = 1
         while self.episode_idx.value < N_GAMES:
@@ -119,6 +116,8 @@ class Agent(mp.Process):
             score = 0 
             self.local_actor_critic.clear_memory()
             while not done:
+                if self.name == 'worker 0':
+                    self.env.render()
                 action = self.local_actor_critic.choose_action(observation)
                 observation_, reward, done, info = self.env.step(action)
                 score += reward
@@ -143,16 +142,17 @@ class Agent(mp.Process):
 
 
 if __name__ == '__main__':
-    lr = 1e-4
+    lr = 1e-3
     env_id = 'CartPole-v0'
     n_actions = 2 
     input_dims = [4]
     N_GAMES = 5000 
     T_MAX = 5 
+    RENDER_EVERY = 100
     global_actor_critic = ActorCritic(input_dims, n_actions)
     global_actor_critic.share_memory()
     optim = SharedAdam(global_actor_critic.parameters(),
-                       lr=lr, betas=(0.92, 0.999))
+                       lr=lr, betas=(0.92, 0.999), weight_decay=1e-5)
     global_ep = mp.Value('i', 0)
 
     workers = [Agent(global_actor_critic,
