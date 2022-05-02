@@ -105,5 +105,33 @@ class Agent(mp.Process):
         self.env = gym.make(env_id)
         self.optimizer = optimizer
 
+    def run(self):
+        t_step = 1
+        while self.episode_idx.value < N_GAMES:
+            done = False
+            observation = env.reset()
+            score = 0 
+            self.local_actor_critic.clear_memory()
+
+            while not done:
+                action = self.local_actor_critic.choose_action(observation)
+                observation_, reward, done, info = self.env.step(action)
+                score += reward
+                self.local_actor_critic.remember(observation, action, reward)
+                if t_step % T_MAX == 0 or done:
+                    loss = self.local_actor_critic.calc_loss(done)
+                    loss.optimizer.zero_grad()
+                    loss.backward()
+                    for local_param, global_param, in zip(self.local_actor_critic.parameters(), 
+                                                          self.global_actor_critic.parameters()):
+                        global_param.grad = local_param.grad
+                    self.optimizer.step()
+                    self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict)
+                    self.local_actor_critic.clear_memory()
+                    t_step += 1 
+                    observation = observation_
+                    with self.episode_idx.get_lock():
+                        self.episode_idx.value += 1
+                    print(self.name, 'episode', self.episode_idx.value, 'reward %1.f' % score)
 
 
