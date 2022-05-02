@@ -93,3 +93,17 @@ jj
         action = dist.sample().numpy()[0]
 
         return action
+
+class Agent(mp.Process):
+    def __init__(self, global_actor_critic, optimizer, input_dims, n_actions,
+            gamma, lr, name, global_ep_idx, env_id):
+        super(Agent, self).__init__()
+        self.local_actor_critic = ActorCritic(input_dims, n_actions, gamma)
+        self.global_actor_critic = global_actor_critic
+        self.name = 'w%02i' + name
+        self.episode_idx = global_ep_idx
+        self.env = gym.make(env_id)
+        self.optimizer = optimizer
+
+
+
