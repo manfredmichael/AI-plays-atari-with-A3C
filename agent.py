@@ -4,22 +4,22 @@ from model import ActorCritic
 
 class Agent(mp.Process):
     N_GAMES = 5000 
-    T_MAX = 5 
+    T_MAX = 10 
     RENDER_EVERY = 100
 
     def __init__(self, global_actor_critic, optimizer, input_dims, n_actions,
-            gamma, lr, name, global_ep_idx, env_id):
+            gamma, lr, name, report, env_id):
         super(Agent, self).__init__()
         self.local_actor_critic = ActorCritic(input_dims, n_actions, gamma)
         self.global_actor_critic = global_actor_critic
         self.name = 'worker ' + str(name)
-        self.episode_idx = global_ep_idx
+        self.report = report 
         self.env = gym.make(env_id)
         self.optimizer = optimizer
 
     def run(self):
         t_step = 1
-        while self.episode_idx.value < self.N_GAMES:
+        while self.report.episode_counter.value < self.N_GAMES:
             done = False
             observation = self.env.reset()
             score = 0 
@@ -45,6 +45,7 @@ class Agent(mp.Process):
                     self.local_actor_critic.clear_memory()
                 t_step += 1 
                 observation = observation_
-            with self.episode_idx.get_lock():
-                self.episode_idx.value += 1
-            print(self.name, 'episode', self.episode_idx.value, 'reward %1.f' % score)
+
+            self.report.add_reward(score)
+            report_log = self.report.report_episode()
+            print(self.name, "  ", report_log) 
